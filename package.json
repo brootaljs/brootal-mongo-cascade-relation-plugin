@@ -1,0 +1,26 @@
+{
+  "name": "@brootal/mongo-cascade-relation-plugin",
+  "version": "0.1.1",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel src -d dist"
+  },
+  "gitHooks": {
+    "pre-commit": "sh patch_version.sh",
+    "post-merge": "sh patch_version_with_commit.sh"
+  },
+  "author": "Anton Nosenko",
+  "license": "MIT",
+  "dependencies": {
+    "lodash": "^4.17.20"
+  },
+  "devDependencies": {
+    "@babel/plugin-proposal-class-properties": "^7.12.13",
+    "@babel/cli": "^7.12.13",
+    "@babel/core": "^7.12.13",
+    "@babel/preset-env": "^7.12.13",
+    "yorkie": "^2.0.0"
+  }
+}

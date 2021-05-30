@@ -1,0 +1,6 @@
+.gitlab-ci.yml
+.github
+patch_version.sh
+patch_version_with_commit.sh
+demo
+src
