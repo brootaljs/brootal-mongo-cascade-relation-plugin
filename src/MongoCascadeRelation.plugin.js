@@ -137,7 +137,7 @@ export default (cascade) => {
             item = new this(item.toObject());
         }
 
-        if (!options.withoutCascade) await onCascadeCreate(item, cascade, this.app);
+        if (!options.withoutCascade) await onCascadeCreate((_.isArray(item) ? item : [item]), cascade, this.app);
         if (this.afterCreate) await this.afterCreate(data, item);
 
         return item;
