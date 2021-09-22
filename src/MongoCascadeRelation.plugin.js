@@ -30,8 +30,18 @@ async function __onDeleteForParent(items, cascade, app) {
   if (!cascade.children) return;
 
   const deletedIds = _.map(items, item => item._id);
-  await Promise.all(_.map(cascade.children, child => {
-    const filter = { [child.foreignKey]: { $in: deletedIds } };
+
+  await Promise.all(_.map(cascade.children, async child => {
+    const filter = {};
+    
+    if (child.localField) {
+      filter[child.foreignKey] = { 
+        $in: _.flatten(_.map(items, item => item[ child.localField ]))
+      };
+    } else {
+      filter[child.foreignKey] = { "$in": deletedIds };
+    }
+    
     return app.services[child.model].deleteMany(filter);
   }));
 }
