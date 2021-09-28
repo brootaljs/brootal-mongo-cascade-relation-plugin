@@ -108,7 +108,7 @@ export default (cascade) => {
 
           if (this.afterDelete) {
             try {
-              await this.afterDelete(id, result);
+              await this.afterDelete({ _id: id }, result ? [ result ] : result);
             } catch (e) {
               console.log("MongoCascadeRelation.plugin (line : 101) | findByIdAndDelete | e : ", e);
             }
@@ -123,7 +123,7 @@ export default (cascade) => {
 
         if (!options.withoutCascade && result) await onCascadeDelete([result], cascade, this.app);
 
-        if (this.afterDelete) await this.afterDelete(filter, result);
+        if (this.afterDelete) await this.afterDelete(filter, result ? [ result ] : result);
 
         return result;
       },
@@ -134,7 +134,7 @@ export default (cascade) => {
         const res = await this.model.deleteMany(filter, options);
 
         if (!options.withoutCascade && res) await onCascadeDelete(data, cascade, this.app);
-        if (this.afterDelete) await this.afterDelete(filter, res);
+        if (this.afterDelete) await this.afterDelete(filter, data);
 
         return res;
       },
@@ -146,7 +146,7 @@ export default (cascade) => {
         const res = await this.model.deleteOne(filter, options);
 
         if (!options.withoutCascade && res) await onCascadeDelete([data], cascade, this.app);
-        if (this.afterDelete) await this.afterDelete(filter, res);
+        if (this.afterDelete) await this.afterDelete(filter, res ? [ res ] : res);
 
         return res;
       },
