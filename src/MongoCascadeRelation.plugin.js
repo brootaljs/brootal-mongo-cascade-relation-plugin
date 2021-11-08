@@ -1,6 +1,6 @@
 import _ from 'lodash';
 
-async function onCascadeCreate(items, cascade, app) {
+async function onCascadeCreate(items, cascade, app, options) {
   async function addChildToParent(cascade, items) {
     let parent = await app.services[cascade.model].findById(items[0][cascade.parentId]);
     items.forEach((item) => {
@@ -8,8 +8,8 @@ async function onCascadeCreate(items, cascade, app) {
         parent[cascade.field].push(item._id);
       }
     });
-    await parent.save();
-  }
+    await parent.save(options);
+  } 
 
   if (cascade.parent) {
     for (let i = 0; i < cascade.parent.length; i++) {
@@ -26,7 +26,7 @@ async function onCascadeCreate(items, cascade, app) {
   }
 }
 
-async function __onDeleteForParent(items, cascade, app) {
+async function __onDeleteForParent(items, cascade, app, options) {
   if (!cascade.children) return;
 
   const deletedIds = _.map(items, item => item._id);
@@ -42,11 +42,11 @@ async function __onDeleteForParent(items, cascade, app) {
       filter[child.foreignKey] = { "$in": deletedIds };
     }
     
-    return app.services[child.model].deleteMany(filter);
+    return app.services[child.model].deleteMany(filter, options);
   }));
 }
 
-async function __onDeleteForChild(items, cascade, app) {
+async function __onDeleteForChild(items, cascade, app, options) {
   async function deleteChildFromParent(cascade, childrens) {
     let itemsIds = _.flatten(childrens).map(item => item._id.toString());
     let parentId = childrens[0][cascade.parentId];
@@ -66,7 +66,7 @@ async function __onDeleteForChild(items, cascade, app) {
       }
       
       try {
-        await parent.save();
+        await parent.save(options);
       } catch (e) {
         console.log("MongoCascadeRelation.plugin (line : 66) | _onDeleteForChild | e : ", e);
       }
@@ -84,10 +84,10 @@ async function __onDeleteForChild(items, cascade, app) {
   }
 }
 
-async function onCascadeDelete(items, cascade, app) {
+async function onCascadeDelete(items, cascade, app, options) {
   return Promise.all([
-    __onDeleteForParent(items, cascade, app),
-    __onDeleteForChild(items, cascade, app)
+    __onDeleteForParent(items, cascade, app, options),
+    __onDeleteForChild(items, cascade, app, options)
   ])
 }
 
@@ -96,11 +96,11 @@ export default (cascade) => {
     staticMethods: {
       async findByIdAndDelete(id, options = {}) {
           if (this.beforeDelete) await this.beforeDelete(id);
-          const result = await this.model.findByIdAndDelete(id);
+          const result = await this.model.findByIdAndDelete(id, options);
 
           if (!options.withoutCascade && result) {
             try {
-              await onCascadeDelete([result], cascade, this.app);
+              await onCascadeDelete([result], cascade, this.app, options);
             } catch (e) {
               console.log("MongoCascadeRelation.plugin (line : 94) | findByIdAndDelete | e : ", e);
             }
@@ -121,7 +121,7 @@ export default (cascade) => {
         if (this.beforeDelete) await this.beforeDelete(filter, options);
         const result = await this.model.findOneAndDelete(filter, options);
 
-        if (!options.withoutCascade && result) await onCascadeDelete([result], cascade, this.app);
+        if (!options.withoutCascade && result) await onCascadeDelete([result], cascade, this.app, options);
 
         if (this.afterDelete) await this.afterDelete(filter, result ? [ result ] : result);
 
@@ -133,31 +133,40 @@ export default (cascade) => {
 
         const res = await this.model.deleteMany(filter, options);
 
-        if (!options.withoutCascade && res) await onCascadeDelete(data, cascade, this.app);
+        if (!options.withoutCascade && res) await onCascadeDelete(data, cascade, this.app, options);
         if (this.afterDelete) await this.afterDelete(filter, data);
 
         return res;
       },
       async deleteOne(filter = {}, options = {}) {
-        if (this.beforeDelete) await this.beforeDelete(filter, options);
+        if (this.beforeDelete) await this.beforeDelete(filter, options = {});
 
         let data = await this.model.findOne(filter, '_id'+(cascade.children ? ' '+cascade.children.map((c) => c.field).join(" "): ''));
 
         const res = await this.model.deleteOne(filter, options);
 
-        if (!options.withoutCascade && res) await onCascadeDelete([data], cascade, this.app);
+        if (!options.withoutCascade && res) await onCascadeDelete([data], cascade, this.app, options);
         if (this.afterDelete) await this.afterDelete(filter, res ? [ res ] : res);
 
         return res;
       },
       async create(data, options = {}) {
         if (this.beforeCreate) data = await this.beforeCreate(data);
-        
+
         let item;
         try {
-            item = await this.model.create(data);
+            // create is universal method and its usage depends on 'data' type
+            // Model.create({}) expected return type is Object
+            // Model.create([{}]) expected return type is Array
+            if (_.isArray(data)) {
+                item = await this.model.create(data, options);
+            } else {
+                // To specify options, docs must be an array, not a spread
+                item = await this.model.create([ data ], options);
+                item = item[0];
+            }
         } catch (e) {
-            console.log("class (line : 147) | create | e : ", e);
+            console.log("class (line : 147) | cascade create | e : ", e);
             throw e;
         }
 
@@ -167,7 +176,7 @@ export default (cascade) => {
             item = new this(item.toObject());
         }
 
-        if (!options.withoutCascade) await onCascadeCreate((_.isArray(item) ? item : [item]), cascade, this.app);
+        if (!options.withoutCascade) await onCascadeCreate((_.isArray(item) ? item : [item]), cascade, this.app, options);
         if (this.afterCreate) await this.afterCreate(data, item);
 
         return item;
